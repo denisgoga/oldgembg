@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from "../_lib/supabase";
+import { getSupabaseServerClient } from "../_lib/supabase.js";
 
 const DEFAULT_TTL_MS = 60_000;
 const DEFAULT_PAGE_LIMIT = 6;

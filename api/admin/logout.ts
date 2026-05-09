@@ -1,4 +1,4 @@
-import { buildClearCookie } from "../_lib/adminCookie";
+import { buildClearCookie } from "../_lib/adminCookie.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
