@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { buildClearCookie } from "./_adminCookie";
+import { formatClearCookieHeader } from "../../shared/adminSession";
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -7,7 +7,7 @@ export const handler: Handler = async (event) => {
   }
 
   const isProd = process.env.NODE_ENV === "production";
-  const cookie = buildClearCookie({ isProd });
+  const cookie = formatClearCookieHeader(isProd);
 
   return {
     statusCode: 200,
@@ -19,4 +19,3 @@ export const handler: Handler = async (event) => {
     body: JSON.stringify({ ok: true }),
   };
 };
-

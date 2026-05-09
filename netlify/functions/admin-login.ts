@@ -1,17 +1,15 @@
 import type { Handler } from "@netlify/functions";
-import { buildSetCookie, makeSessionValue } from "./_adminCookie";
-
-const DEFAULT_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+import {
+  formatSetCookieHeader,
+  getAdminPassword,
+  getAdminSessionMaxAgeMs,
+  getAdminSessionSecret,
+  makeAdminSessionToken,
+} from "../../shared/adminSession";
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
-  }
-
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!adminPassword || !secret) {
-    return { statusCode: 500, body: "Missing ADMIN_PASSWORD/ADMIN_SESSION_SECRET" };
   }
 
   let password = "";
@@ -22,24 +20,32 @@ export const handler: Handler = async (event) => {
     // ignore parse errors
   }
 
-  if (!password || password !== adminPassword) {
-    return { statusCode: 401, body: "Unauthorized" };
+  try {
+    if (!password || password !== getAdminPassword()) {
+      return { statusCode: 401, body: "Unauthorized" };
+    }
+
+    const secret = getAdminSessionSecret();
+    const isProd = process.env.NODE_ENV === "production";
+    const maxAgeSeconds = Math.floor(getAdminSessionMaxAgeMs() / 1000);
+    const cookie = formatSetCookieHeader(makeAdminSessionToken(secret), {
+      isProd,
+      maxAgeSeconds,
+    });
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": cookie,
+        "Cache-Control": "no-store",
+      },
+      body: JSON.stringify({ ok: true }),
+    };
+  } catch (e) {
+    return {
+      statusCode: 500,
+      body: e instanceof Error ? e.message : "Server error",
+    };
   }
-
-  const isProd = process.env.NODE_ENV === "production";
-  const cookie = buildSetCookie(makeSessionValue(secret), {
-    isProd,
-    maxAgeSeconds: DEFAULT_MAX_AGE_SECONDS,
-  });
-
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": cookie,
-      "Cache-Control": "no-store",
-    },
-    body: JSON.stringify({ ok: true }),
-  };
 };
-

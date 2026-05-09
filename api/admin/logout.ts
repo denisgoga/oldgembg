@@ -1,4 +1,4 @@
-import { buildClearCookie } from "../_lib/adminCookie.js";
+import { formatClearCookieHeader } from "../../shared/adminSession";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -7,7 +7,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const isProd = process.env.NODE_ENV === "production";
-  res.setHeader("Set-Cookie", buildClearCookie(isProd));
+  res.setHeader("Set-Cookie", formatClearCookieHeader(isProd));
   res.setHeader("Cache-Control", "no-store");
   res.status(200).json({ ok: true });
 }

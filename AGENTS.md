@@ -25,8 +25,11 @@ server/                   # Express API backend
 ├── index.ts              # Main server setup (express config + routes)
 └── routes/               # API handlers
 
-shared/                   # Types used by both client & server
-└── api.ts                # Example of how to share api interfaces
+shared/                   # Shared types + server helpers (catalog, admin session, Supabase)
+├── api.ts                # Public API / catalog response types
+├── adminSession.ts       # Admin cookie signing (Express, Vercel, Netlify)
+├── publicCatalog.ts      # Catalog fetch + in-memory cache
+└── supabaseServer.ts     # Server Supabase client
 ```
 
 ## Key Features
@@ -74,13 +77,14 @@ className={cn(
 - **API endpoints**: Prefixed with `/api/`
 
 #### Example API Routes
-- `GET /api/ping` - Simple ping api
-- `GET /api/demo` - Demo endpoint  
+- `GET /api/ping` — health check
+- `GET /api/public/catalog` — cached videos + site settings + banners
+- `POST /api/admin/login` / `GET /api/admin/me` / `POST /api/admin/logout` — admin session (httpOnly cookie)
 
 ### Shared Types
 Import consistent types in both client and server:
 ```typescript
-import { DemoResponse } from '@shared/api';
+import type { PublicCatalogResponse } from '@shared/api';
 ```
 
 Path aliases:

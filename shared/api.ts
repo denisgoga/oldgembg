@@ -1,15 +1,6 @@
 /**
- * Shared code between client and server
- * Useful to share types between client and server
- * and/or small pure JS functions that can be used on both client and server
+ * Shared types (and optional pure helpers) for client + server.
  */
-
-/**
- * Example response type for /api/demo
- */
-export interface DemoResponse {
-  message: string;
-}
 
 /** Mirrors client `Video` / `SiteSettings` for `/api/public/catalog` JSON. */
 export type PublicCatalogVideo = {
