@@ -14,14 +14,20 @@ const loginBodySchema = z.object({
 });
 
 export const handleAdminLogin: RequestHandler = (req, res) => {
+  const parsed = loginBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "bad_request", message: "Password is required." });
+    return;
+  }
+  const { password } = parsed.data;
+
   try {
-    const { password } = loginBodySchema.parse(req.body);
-    const secret = getAdminSessionSecret();
     if (password !== getAdminPassword()) {
       res.status(401).json({ error: "invalid_credentials" });
       return;
     }
 
+    const secret = getAdminSessionSecret();
     res.cookie(ADMIN_SESSION_COOKIE_NAME, makeAdminSessionToken(secret), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -31,10 +37,8 @@ export const handleAdminLogin: RequestHandler = (req, res) => {
     });
     res.status(200).json({ ok: true });
   } catch (err) {
-    res.status(400).json({
-      error: "bad_request",
-      message: err instanceof Error ? err.message : "Invalid request",
-    });
+    const message = err instanceof Error ? err.message : "Server error";
+    res.status(500).json({ error: "server_error", message });
   }
 };
 
@@ -44,11 +48,17 @@ export const handleAdminLogout: RequestHandler = (_req, res) => {
 };
 
 export const handleAdminMe: RequestHandler = (req, res) => {
-  const cookieValue = req.cookies?.[ADMIN_SESSION_COOKIE_NAME] as string | undefined;
-  const ok = verifyAdminSessionToken(cookieValue, getAdminSessionSecret());
-  if (!ok) {
-    res.status(401).json({ authenticated: false });
-    return;
+  try {
+    const secret = getAdminSessionSecret();
+    const cookieValue = req.cookies?.[ADMIN_SESSION_COOKIE_NAME] as string | undefined;
+    const ok = verifyAdminSessionToken(cookieValue, secret);
+    if (!ok) {
+      res.status(401).json({ authenticated: false });
+      return;
+    }
+    res.status(200).json({ authenticated: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Server error";
+    res.status(500).json({ error: "server_error", message });
   }
-  res.status(200).json({ authenticated: true });
 };

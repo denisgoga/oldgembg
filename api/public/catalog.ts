@@ -2,7 +2,7 @@ import {
   getOrBuildCatalogJsonBody,
   parseCatalogPagination,
   setCatalogCacheControlHeader,
-} from "../../shared/publicCatalog";
+} from "../../shared/publicCatalog.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "GET") {

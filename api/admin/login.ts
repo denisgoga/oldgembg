@@ -4,7 +4,7 @@ import {
   getAdminSessionMaxAgeMs,
   getAdminSessionSecret,
   makeAdminSessionToken,
-} from "../../shared/adminSession";
+} from "../../shared/adminSession.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -12,10 +12,20 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const json = (status: number, body: Record<string, unknown>) => {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.status(status).json(body);
+  };
+
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!password) {
+    json(400, { error: "bad_request", message: "Password is required." });
+    return;
+  }
+
   try {
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
-    if (!password || password !== getAdminPassword()) {
-      res.status(401).json({ error: "invalid_credentials" });
+    if (password !== getAdminPassword()) {
+      json(401, { error: "invalid_credentials" });
       return;
     }
 
@@ -27,8 +37,10 @@ export default async function handler(req: any, res: any) {
       formatSetCookieHeader(makeAdminSessionToken(secret), { isProd, maxAgeSeconds }),
     );
     res.setHeader("Cache-Control", "no-store");
-    res.status(200).json({ ok: true });
+    json(200, { ok: true });
   } catch (e) {
-    res.status(500).send(e instanceof Error ? e.message : "Server error");
+    const message = e instanceof Error ? e.message : "Server error";
+    res.setHeader("Cache-Control", "no-store");
+    json(500, { error: "server_error", message });
   }
 }

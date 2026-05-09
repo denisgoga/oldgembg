@@ -1,5 +1,5 @@
 import type { PublicCatalogResponse } from "./api";
-import { getSupabaseServerClient } from "./supabaseServer";
+import { getSupabaseServerClient } from "./supabaseServer.js";
 
 export const DEFAULT_CATALOG_PAGE_LIMIT = 6;
 const DEFAULT_CACHE_TTL_MS = 60_000;

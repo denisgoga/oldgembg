@@ -3,6 +3,24 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+async function readErrorDetail(res: Response): Promise<string | undefined> {
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    try {
+      const data = (await res.json()) as { message?: string; error?: string };
+      return data.message ?? data.error;
+    } catch {
+      return undefined;
+    }
+  }
+  try {
+    const text = await res.text();
+    return text?.slice(0, 200) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,6 +50,8 @@ export default function AdminLogin() {
         return;
       }
 
+      const detail = await readErrorDetail(res);
+
       if (res.status === 401) {
         toast({
           title: "Error",
@@ -43,7 +63,7 @@ export default function AdminLogin() {
 
       toast({
         title: "Error",
-        description: "Login failed",
+        description: detail ?? `Login failed (${res.status})`,
         variant: "destructive",
       });
     } catch (err) {
