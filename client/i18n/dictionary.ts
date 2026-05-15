@@ -8,8 +8,6 @@ const DICT: Record<Locale, Dict> = {
     "common.loadError":
       "We could not load the catalog. The service may be busy — please try again.",
     "common.retry": "Try again",
-    "index.itemsAvailableSingular": "{{count}} item available",
-    "index.itemsAvailablePlural": "{{count}} items available",
     "index.howItWorks": "How it works",
     "index.featuredContent": "Featured Content",
     "index.browsePremium":
@@ -47,8 +45,6 @@ const DICT: Record<Locale, Dict> = {
     "common.loadError":
       "Der Katalog konnte nicht geladen werden. Der Dienst ist möglicherweise überlastet — bitte erneut versuchen.",
     "common.retry": "Erneut versuchen",
-    "index.itemsAvailableSingular": "{{count}} Eintrag verfügbar",
-    "index.itemsAvailablePlural": "{{count}} Einträge verfügbar",
     "index.howItWorks": "So funktioniert's",
     "index.featuredContent": "Empfohlener Inhalt",
     "index.browsePremium":
@@ -86,8 +82,6 @@ const DICT: Record<Locale, Dict> = {
     "common.loadError":
       "Impossibile caricare il catalogo. Il servizio potrebbe essere occupato — riprova.",
     "common.retry": "Riprova",
-    "index.itemsAvailableSingular": "{{count}} elemento disponibile",
-    "index.itemsAvailablePlural": "{{count}} elementi disponibili",
     "index.howItWorks": "Come funziona",
     "index.featuredContent": "Contenuti in evidenza",
     "index.browsePremium":
@@ -125,8 +119,6 @@ const DICT: Record<Locale, Dict> = {
     "common.loadError":
       "No pudimos cargar el catálogo. El servicio puede estar ocupado — inténtalo de nuevo.",
     "common.retry": "Intentar de nuevo",
-    "index.itemsAvailableSingular": "{{count}} elemento disponible",
-    "index.itemsAvailablePlural": "{{count}} elementos disponibles",
     "index.howItWorks": "Cómo funciona",
     "index.featuredContent": "Contenido destacado",
     "index.browsePremium":
@@ -164,8 +156,6 @@ const DICT: Record<Locale, Dict> = {
     "common.loadError":
       "Impossible de charger le catalogue. Le service est peut-être saturé — réessayez.",
     "common.retry": "Réessayer",
-    "index.itemsAvailableSingular": "{{count}} élément disponible",
-    "index.itemsAvailablePlural": "{{count}} éléments disponibles",
     "index.howItWorks": "Comment ça marche",
     "index.featuredContent": "Contenu vedette",
     "index.browsePremium":

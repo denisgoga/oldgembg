@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AccessModal } from "@/components/AccessModal";
 import {
@@ -10,7 +10,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { supabase, type Video, type SiteSettings } from "@/lib/supabase";
-import type { PublicCatalogResponse, PublicHomepageBanner } from "@shared/api";
+import type { PublicHomepageBanner } from "@shared/api";
 import { HomepageBannerAd } from "@/components/HomepageBannerAd";
 import { useLocale } from "@/i18n/LocaleContext";
 import { t } from "@/i18n/dictionary";
@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { fetchPublicCatalogPage } from "@/lib/fetchPublicCatalog";
 
 const catalogUrl =
   import.meta.env.VITE_PUBLIC_CATALOG_URL?.trim() || "/api/public/catalog";
@@ -31,23 +32,8 @@ const PAGE_SIZE = 6;
 
 const VIDEO_QUERY_TIMEOUT_MS = 25_000;
 
-function buildCatalogFetchUrl(
-  base: string,
-  page: number,
-  limit: number,
-): string {
-  if (base.startsWith("http://") || base.startsWith("https://")) {
-    const u = new URL(base);
-    u.searchParams.set("page", String(page));
-    u.searchParams.set("limit", String(limit));
-    return u.toString();
-  }
-  const [path, qs] = base.includes("?") ? base.split("?", 2) : [base, ""];
-  const params = new URLSearchParams(qs);
-  params.set("page", String(page));
-  params.set("limit", String(limit));
-  return `${path}?${params.toString()}`;
-}
+/** Debounce burst Postgres realtime events into a single catalog refetch. */
+const REALTIME_CATALOG_DEBOUNCE_MS = 450;
 
 function mapRowsToPublicBanners(rows: unknown[] | null): PublicHomepageBanner[] {
   if (!rows?.length) return [];
@@ -148,6 +134,8 @@ export default function Index() {
   const pageRef = useRef(page);
   pageRef.current = page;
 
+  const realtimeCatalogRefreshTimerRef = useRef<number | null>(null);
+
   const clearThumbnailWarmupTimer = () => {
     const id = thumbnailWarmupTimerRef.current;
     if (id !== null) {
@@ -173,26 +161,30 @@ export default function Index() {
     };
   }, []);
 
-  const loadCatalogPageRef = useRef<(pageNum: number) => Promise<void>>(
-    async () => {},
-  );
+  const loadCatalogPageRef = useRef<
+    (pageNum: number, opts?: { bypassCache?: boolean }) => Promise<void>
+  >(async () => {});
 
-  loadCatalogPageRef.current = async (pageNum: number) => {
+  loadCatalogPageRef.current = async (
+    pageNum: number,
+    opts?: { bypassCache?: boolean },
+  ) => {
     let loadedFromApi = false;
     if (import.meta.env.VITE_DISABLE_CATALOG_API !== "true") {
       try {
-        const url = buildCatalogFetchUrl(catalogUrl, pageNum, PAGE_SIZE);
-        const res = await withTimeout(fetch(url), VIDEO_QUERY_TIMEOUT_MS);
-        if (res.ok) {
-          const catalog = (await res.json()) as PublicCatalogResponse;
-          setVideos(catalog.videos as Video[]);
-          setTotalCount(catalog.totalCount);
-          setSiteSettings(
-            (catalog.siteSettings as SiteSettings | null) ?? null,
-          );
-          setHomepageBanners(Array.isArray(catalog.banners) ? catalog.banners : []);
-          loadedFromApi = true;
-        }
+        const catalog = await withTimeout(
+          fetchPublicCatalogPage(catalogUrl, pageNum, PAGE_SIZE, {
+            bypassCache: opts?.bypassCache,
+          }),
+          VIDEO_QUERY_TIMEOUT_MS,
+        );
+        setVideos(catalog.videos as Video[]);
+        setTotalCount(catalog.totalCount);
+        setSiteSettings(
+          (catalog.siteSettings as SiteSettings | null) ?? null,
+        );
+        setHomepageBanners(Array.isArray(catalog.banners) ? catalog.banners : []);
+        loadedFromApi = true;
       } catch {
         // Supabase fallback
       }
@@ -238,6 +230,23 @@ export default function Index() {
       );
     }
   };
+
+  const scheduleRealtimeCatalogRefresh = useCallback(() => {
+    const prev = realtimeCatalogRefreshTimerRef.current;
+    if (prev !== null) window.clearTimeout(prev);
+    realtimeCatalogRefreshTimerRef.current = window.setTimeout(() => {
+      realtimeCatalogRefreshTimerRef.current = null;
+      void (async () => {
+        try {
+          await loadCatalogPageRef.current(pageRef.current, {
+            bypassCache: true,
+          });
+        } catch {
+          /* ignore realtime refresh errors */
+        }
+      })();
+    }, REALTIME_CATALOG_DEBOUNCE_MS);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,34 +295,25 @@ export default function Index() {
         "postgres_changes",
         { event: "*", schema: "public", table: "videos" },
         () => {
-          void (async () => {
-            try {
-              await loadCatalogPageRef.current(pageRef.current);
-            } catch {
-              /* ignore realtime refresh errors */
-            }
-          })();
+          scheduleRealtimeCatalogRefresh();
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "homepage_banners" },
         () => {
-          void (async () => {
-            try {
-              await loadCatalogPageRef.current(pageRef.current);
-            } catch {
-              /* ignore realtime refresh errors */
-            }
-          })();
+          scheduleRealtimeCatalogRefresh();
         },
       )
       .subscribe();
 
     return () => {
       void channel.unsubscribe();
+      const id = realtimeCatalogRefreshTimerRef.current;
+      if (id !== null) window.clearTimeout(id);
+      realtimeCatalogRefreshTimerRef.current = null;
     };
-  }, []);
+  }, [scheduleRealtimeCatalogRefresh]);
 
   // Apply SEO meta from site_settings (title, description, OG, Twitter – for crawlers that run JS)
   useEffect(() => {
@@ -425,10 +425,7 @@ export default function Index() {
         <header className="border-b border-border bg-background sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-4">
             <Logo onNavigateHome={() => setPage(1)} />
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-5 w-28 hidden sm:block" />
-              <Skeleton className="h-9 w-24 rounded-md" />
-            </div>
+            <Skeleton className="h-9 w-24 rounded-md" />
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-6">
@@ -503,22 +500,9 @@ export default function Index() {
       <div className="min-h-screen">
         {/* Header */}
         <header className="border-b border-border bg-background sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
-              <Logo onNavigateHome={() => setPage(1)} />
-              <div className="flex items-center gap-4">
-                <div className="hidden sm:block text-right text-sm text-muted-foreground">
-                  {t(
-                    locale,
-                    totalCount === 1
-                      ? "index.itemsAvailableSingular"
-                      : "index.itemsAvailablePlural",
-                    { count: totalCount },
-                  )}
-                </div>
-                <LanguageSwitcher />
-              </div>
-            </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-4">
+            <Logo onNavigateHome={() => setPage(1)} />
+            <LanguageSwitcher />
           </div>
         </header>
 
