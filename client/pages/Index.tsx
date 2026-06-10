@@ -9,12 +9,21 @@ import { Logo } from "@/components/Logo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { supabase, type Video, type SiteSettings } from "@/lib/supabase";
+import {
+  supabase,
+  type Video,
+  type SiteSettings,
+  type PopupSettings,
+} from "@/lib/supabase";
+import { pickAffiliateUrl } from "@/lib/pickAffiliateUrl";
 import type { PublicHomepageBanner } from "@shared/api";
 import { HomepageBannerAd } from "@/components/HomepageBannerAd";
 import { useLocale } from "@/i18n/LocaleContext";
 import { t } from "@/i18n/dictionary";
-import { getSiteStringsForLocale } from "@/i18n/dbTranslation";
+import {
+  getPopupStringsForLocale,
+  getSiteStringsForLocale,
+} from "@/i18n/dbTranslation";
 import {
   Dialog,
   DialogContent,
@@ -125,7 +134,15 @@ export default function Index() {
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Video | null>(null);
   const [warmingVideoId, setWarmingVideoId] = useState<string | null>(null);
+  const [directLinkWaitingVideoId, setDirectLinkWaitingVideoId] = useState<
+    string | null
+  >(null);
+  const [popupSettings, setPopupSettings] = useState<PopupSettings | null>(
+    null,
+  );
   const thumbnailWarmupTimerRef = useRef<number | null>(null);
+  const popupSettingsRef = useRef(popupSettings);
+  popupSettingsRef.current = popupSettings;
   const [activeFooterDialog, setActiveFooterDialog] = useState<
     "terms" | "privacy" | "contact" | null
   >(null);
@@ -136,19 +153,45 @@ export default function Index() {
 
   const realtimeCatalogRefreshTimerRef = useRef<number | null>(null);
 
-  const clearThumbnailWarmupTimer = () => {
+  const clearThumbnailWarmupState = () => {
     const id = thumbnailWarmupTimerRef.current;
     if (id !== null) {
       window.clearTimeout(id);
       thumbnailWarmupTimerRef.current = null;
     }
+    setWarmingVideoId(null);
+    setDirectLinkWaitingVideoId(null);
+  };
+
+  const openAffiliateLink = () => {
+    const url = pickAffiliateUrl(popupSettingsRef.current);
+    if (url) window.open(url, "_blank");
+  };
+
+  const handleThumbnailClick = (video: Video) => {
+    if (directLinkWaitingVideoId === video.id) {
+      openAffiliateLink();
+      return;
+    }
+    scheduleAccessModalFromThumbnail(video);
   };
 
   const scheduleAccessModalFromThumbnail = (video: Video) => {
-    clearThumbnailWarmupTimer();
+    const id = thumbnailWarmupTimerRef.current;
+    if (id !== null) {
+      window.clearTimeout(id);
+      thumbnailWarmupTimerRef.current = null;
+    }
+    setDirectLinkWaitingVideoId(null);
     setWarmingVideoId(video.id);
     thumbnailWarmupTimerRef.current = window.setTimeout(() => {
       thumbnailWarmupTimerRef.current = null;
+      const settings = popupSettingsRef.current;
+      if (settings?.hide_popup) {
+        openAffiliateLink();
+        setDirectLinkWaitingVideoId(video.id);
+        return;
+      }
       setWarmingVideoId(null);
       setSelectedItem(video);
       setAccessModalOpen(true);
@@ -156,10 +199,57 @@ export default function Index() {
   };
 
   useEffect(() => {
+    const fetchPopupSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("popup_settings")
+          .select("*")
+          .limit(1)
+          .single();
+        if (error) throw error;
+        setPopupSettings(data);
+      } catch (error) {
+        console.error("Error fetching popup settings:", error);
+      }
+    };
+
+    void fetchPopupSettings();
+
+    const channel = supabase
+      .channel("index-popup-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "popup_settings" },
+        (payload) => {
+          setPopupSettings(payload.new as PopupSettings);
+        },
+      )
+      .subscribe();
+
     return () => {
-      clearThumbnailWarmupTimer();
+      const id = thumbnailWarmupTimerRef.current;
+      if (id !== null) window.clearTimeout(id);
+      void channel.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    clearThumbnailWarmupState();
+  }, [page]);
+
+  useEffect(() => {
+    if (!warmingVideoId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-video-warmup-card]")) return;
+      clearThumbnailWarmupState();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [warmingVideoId]);
 
   const loadCatalogPageRef = useRef<
     (pageNum: number, opts?: { bypassCache?: boolean }) => Promise<void>
@@ -484,13 +574,17 @@ export default function Index() {
     ? footerDialogContent[activeFooterDialog]
     : null;
 
+  const popupStrings = getPopupStringsForLocale(popupSettings, locale);
+  const directLinkHint =
+    popupStrings.direct_link_hint?.trim() ||
+    "Almost there — complete your free sign-up to watch";
+
   return (
     <>
       <AccessModal
         isOpen={accessModalOpen}
         onClose={() => {
-          clearThumbnailWarmupTimer();
-          setWarmingVideoId(null);
+          clearThumbnailWarmupState();
           setAccessModalOpen(false);
           setSelectedItem(null);
         }}
@@ -538,8 +632,15 @@ export default function Index() {
                       key={slot.video.id}
                       video={slot.video}
                       isWarmupPlaying={warmingVideoId === slot.video.id}
-                      warmupHint={t(locale, "index.thumbnailWarmupHint")}
-                      onClick={() => scheduleAccessModalFromThumbnail(slot.video)}
+                      isDirectLinkWaiting={
+                        directLinkWaitingVideoId === slot.video.id
+                      }
+                      warmupHint={
+                        directLinkWaitingVideoId === slot.video.id
+                          ? directLinkHint
+                          : t(locale, "index.thumbnailWarmupHint")
+                      }
+                      onClick={() => handleThumbnailClick(slot.video)}
                     />
                   ) : (
                     <div

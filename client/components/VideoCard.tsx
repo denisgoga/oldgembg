@@ -14,6 +14,8 @@ interface VideoCardProps {
   onClick: () => void;
   /** Fake “playback starting” overlay before the access modal */
   isWarmupPlaying?: boolean;
+  /** Direct-link mode: thumbnail stays loading; clicks reopen the affiliate link */
+  isDirectLinkWaiting?: boolean;
   warmupHint?: string;
 }
 
@@ -21,16 +23,22 @@ export function VideoCard({
   video,
   onClick,
   isWarmupPlaying = false,
+  isDirectLinkWaiting = false,
   warmupHint,
 }: VideoCardProps) {
+  const warmupBlocksClick = isWarmupPlaying && !isDirectLinkWaiting;
   const { title, duration, thumbnail } = video;
   return (
     <div
       role="button"
-      tabIndex={isWarmupPlaying ? -1 : 0}
-      onClick={onClick}
+      tabIndex={warmupBlocksClick ? -1 : 0}
+      {...(isWarmupPlaying ? { "data-video-warmup-card": true } : {})}
+      onClick={() => {
+        if (warmupBlocksClick) return;
+        onClick();
+      }}
       onKeyDown={(e) => {
-        if (isWarmupPlaying) return;
+        if (warmupBlocksClick) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();
@@ -40,7 +48,9 @@ export function VideoCard({
       className={cn(
         "group relative overflow-hidden hover:border-primary transition-all duration-300",
         isWarmupPlaying
-          ? "cursor-wait pointer-events-none border-primary"
+          ? isDirectLinkWaiting
+            ? "cursor-pointer border-primary"
+            : "cursor-wait border-primary"
           : "cursor-pointer",
         CATALOG_THUMBNAIL_FRAME_CLASS,
       )}

@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS popup_settings (
   affiliate_link_a TEXT NOT NULL DEFAULT '',
   affiliate_link_b TEXT NOT NULL DEFAULT '',
   affiliate_split_a INTEGER NOT NULL DEFAULT 50,
+  hide_popup BOOLEAN NOT NULL DEFAULT false,
+  direct_link_hint TEXT NOT NULL DEFAULT 'Almost there — complete your free sign-up to watch',
   popup_translations JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -46,7 +48,7 @@ CREATE POLICY "Allow public read popup" ON popup_settings FOR SELECT USING (true
 CREATE POLICY "Allow all popup" ON popup_settings FOR ALL USING (true) WITH CHECK (true);
 
 -- Fus rreshtin e parë në popup_settings nëse nuk ekziston
-INSERT INTO popup_settings (title, description, button_text, waiting_title, waiting_description, waiting_button_text, button_color, popup_bg_color, affiliate_link, affiliate_link_a, affiliate_link_b, affiliate_split_a, popup_translations)
+INSERT INTO popup_settings (title, description, button_text, waiting_title, waiting_description, waiting_button_text, button_color, popup_bg_color, affiliate_link, affiliate_link_a, affiliate_link_b, affiliate_split_a, hide_popup, direct_link_hint, popup_translations)
 SELECT
   'Free Registration',
   'Register for free to unlock access to this content. You will be redirected to complete sign-up.',
@@ -60,6 +62,8 @@ SELECT
   '',
   '',
   50,
+  false,
+  'Almost there — complete your free sign-up to watch',
   jsonb_build_object(
     'en',
     jsonb_build_object(
@@ -68,7 +72,8 @@ SELECT
       'button_text', 'Continue to free access',
       'waiting_title', 'Waiting for Registration',
       'waiting_description', 'Please complete your free registration in the new window. Once you finish, you''ll have full access to all premium videos.',
-      'waiting_button_text', 'Open Link Again'
+      'waiting_button_text', 'Open Link Again',
+      'direct_link_hint', 'Almost there — complete your free sign-up to watch'
     )
   )
 WHERE NOT EXISTS (SELECT 1 FROM popup_settings LIMIT 1);

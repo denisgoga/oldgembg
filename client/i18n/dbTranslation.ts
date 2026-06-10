@@ -65,6 +65,7 @@ export function getPopupStringsForLocale(
       waiting_title: null as string | null,
       waiting_description: null as string | null,
       waiting_button_text: null as string | null,
+      direct_link_hint: null as string | null,
     };
   }
 
@@ -82,6 +83,9 @@ export function getPopupStringsForLocale(
       popup.waiting_description) as string | null,
     waiting_button_text: (tr.waiting_button_text ??
       popup.waiting_button_text) as string | null,
+    direct_link_hint: (tr.direct_link_hint ?? popup.direct_link_hint) as
+      | string
+      | null,
   };
 }
 

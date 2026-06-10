@@ -34,6 +34,10 @@ export type PopupSettings = {
   affiliate_link_b?: string | null;
   /** Percent (0-100) of clicks routed to affiliate_link_a. */
   affiliate_split_a?: number | null;
+  /** When true, skip the registration popup and open the affiliate link after thumbnail warmup. */
+  hide_popup?: boolean | null;
+  /** Hint shown on the thumbnail while waiting for sign-up (direct link mode). */
+  direct_link_hint?: string | null;
   // i18n JSONB map: { "en": { title, description, ... }, "de": { ... }, ... }
   popup_translations: Record<string, PopupTranslations> | null;
   created_at: string;
@@ -47,6 +51,7 @@ export type PopupTranslations = {
   waiting_title?: string | null;
   waiting_description?: string | null;
   waiting_button_text?: string | null;
+  direct_link_hint?: string | null;
 };
 
 export type SiteSettings = {

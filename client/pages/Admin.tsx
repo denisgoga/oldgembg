@@ -44,11 +44,13 @@ export default function Admin() {
     waiting_title: "",
     waiting_description: "",
     waiting_button_text: "",
+    direct_link_hint: "",
     affiliate_link: "",
     affiliate_link_a: "",
     affiliate_link_b: "",
     affiliate_split_a: 50,
   });
+  const [hidePopupSaving, setHidePopupSaving] = useState(false);
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
   const [homepageBanners, setHomepageBanners] = useState<HomepageBanner[]>([]);
   const [bannerFormMode, setBannerFormMode] = useState<
@@ -158,6 +160,10 @@ export default function Admin() {
             strings.waiting_button_text ??
             data.waiting_button_text ??
             "Open Link Again",
+          direct_link_hint:
+            strings.direct_link_hint ??
+            data.direct_link_hint ??
+            "Almost there — complete your free sign-up to watch",
           affiliate_link: data.affiliate_link,
           affiliate_link_a: (data.affiliate_link_a ?? "").toString(),
           affiliate_link_b: (data.affiliate_link_b ?? "").toString(),
@@ -469,6 +475,10 @@ export default function Admin() {
       waiting_title: strings.waiting_title ?? "",
       waiting_description: strings.waiting_description ?? "",
       waiting_button_text: strings.waiting_button_text ?? "",
+      direct_link_hint:
+        strings.direct_link_hint ??
+        popupSettings.direct_link_hint ??
+        "Almost there — complete your free sign-up to watch",
       affiliate_link: popupSettings.affiliate_link,
       affiliate_link_a: (popupSettings.affiliate_link_a ?? "").toString(),
       affiliate_link_b: (popupSettings.affiliate_link_b ?? "").toString(),
@@ -737,6 +747,42 @@ export default function Admin() {
     }
   };
 
+  const handleHidePopupChange = async (checked: boolean) => {
+    if (!popupSettings) return;
+
+    setHidePopupSaving(true);
+    try {
+      const { error } = await supabase
+        .from("popup_settings")
+        .update({
+          hide_popup: checked,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", popupSettings.id);
+
+      if (error) throw error;
+
+      setPopupSettings((prev) =>
+        prev ? { ...prev, hide_popup: checked } : prev,
+      );
+      toast({
+        title: "Success",
+        description: checked
+          ? "Registration popup hidden — affiliate link opens directly."
+          : "Registration popup is shown again.",
+      });
+    } catch (error) {
+      console.error("Error updating hide popup setting:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update popup visibility",
+        variant: "destructive",
+      });
+    } finally {
+      setHidePopupSaving(false);
+    }
+  };
+
   const handleUpdatePopupSettings = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -752,6 +798,7 @@ export default function Admin() {
           waiting_title: popupForm.waiting_title,
           waiting_description: popupForm.waiting_description,
           waiting_button_text: popupForm.waiting_button_text,
+          direct_link_hint: popupForm.direct_link_hint,
         },
       };
 
@@ -774,6 +821,7 @@ export default function Admin() {
         payload.waiting_title = popupForm.waiting_title;
         payload.waiting_description = popupForm.waiting_description;
         payload.waiting_button_text = popupForm.waiting_button_text;
+        payload.direct_link_hint = popupForm.direct_link_hint;
       }
 
       const { error } = await supabase
@@ -1493,6 +1541,21 @@ export default function Admin() {
 
               {!editingPopup ? (
                 <>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary p-3">
+                    <div>
+                      <p className="text-sm font-medium">Hide registration popup</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        When on, the affiliate link opens after the thumbnail
+                        loading animation — no popup.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!popupSettings?.hide_popup}
+                      onCheckedChange={handleHidePopupChange}
+                      disabled={hidePopupSaving || !popupSettings}
+                    />
+                  </div>
+
                   {/* Preview */}
                   <div>
                     <h3 className="font-semibold mb-3">Preview</h3>
@@ -1582,6 +1645,28 @@ export default function Admin() {
                       onChange={handlePopupFormChange}
                       className="w-full px-3 py-2 bg-input border border-border rounded text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs font-semibold mb-3 text-muted-foreground">
+                      Direct link mode (when popup is hidden)
+                    </p>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">
+                        Thumbnail loading message
+                      </label>
+                      <input
+                        type="text"
+                        name="direct_link_hint"
+                        value={popupForm.direct_link_hint}
+                        onChange={handlePopupFormChange}
+                        placeholder="Almost there — complete your free sign-up to watch"
+                        className="w-full px-3 py-2 bg-input border border-border rounded text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1.5">
+                        Shown under the spinner after the affiliate link opens.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="border-t border-border pt-4">

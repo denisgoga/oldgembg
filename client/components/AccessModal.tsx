@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { supabase, type PopupSettings, type Video } from "@/lib/supabase";
+import { pickAffiliateUrl } from "@/lib/pickAffiliateUrl";
 import { useLocale } from "@/i18n/LocaleContext";
 import { t } from "@/i18n/dictionary";
 import { getPopupStringsForLocale } from "@/i18n/dbTranslation";
@@ -25,26 +26,6 @@ export function AccessModal({ isOpen, onClose, selectedItem }: AccessModalProps)
     "Please complete your free registration in the new window. Once you finish, you'll have full access to all premium videos.";
   const waitingButtonText =
     popupStrings.waiting_button_text ?? "Open Link Again";
-
-  const pickAffiliateUrl = (): string => {
-    const a = (popupSettings?.affiliate_link_a ?? "").trim();
-    const b = (popupSettings?.affiliate_link_b ?? "").trim();
-    const legacy = (popupSettings?.affiliate_link ?? "").trim();
-
-    const hasA = a.length > 0;
-    const hasB = b.length > 0;
-
-    if (hasA && hasB) {
-      const splitA = Math.min(
-        100,
-        Math.max(0, popupSettings?.affiliate_split_a ?? 50),
-      );
-      return Math.random() * 100 < splitA ? a : b;
-    }
-    if (hasA) return a;
-    if (hasB) return b;
-    return legacy;
-  };
 
   // Fetch popup settings on mount
   useEffect(() => {
@@ -99,7 +80,7 @@ export function AccessModal({ isOpen, onClose, selectedItem }: AccessModalProps)
     setRegistrationStarted(true);
 
     // Open affiliate link in a new window/tab
-    const url = pickAffiliateUrl();
+    const url = pickAffiliateUrl(popupSettings);
     if (url) window.open(url, "_blank");
   };
 
@@ -204,7 +185,7 @@ export function AccessModal({ isOpen, onClose, selectedItem }: AccessModalProps)
 
             <button
               onClick={() => {
-                const url = pickAffiliateUrl();
+                const url = pickAffiliateUrl(popupSettings);
                 if (url) window.open(url, "_blank");
               }}
               className="w-full btn-gradient text-white font-semibold py-3 rounded-lg transition-all"
